@@ -20,6 +20,10 @@ jobs:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
 
+    - name: Install powershell-toml module
+      shell: pwsh
+      run: Install-Module -Name powershell-toml -Force -Scope CurrentUser
+
     - name: Get package name and version
       id: package_info
       shell: pwsh
@@ -48,4 +52,3 @@ jobs:
       with:
         name: windows-executable
         path: target/release/${{ steps.rename.outputs.EXE_NAME }}
-
