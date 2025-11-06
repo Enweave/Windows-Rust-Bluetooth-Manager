@@ -13,8 +13,8 @@ use tokio::runtime::Builder;
 fn main() {
     let rt = Builder::new_current_thread().enable_all().build().unwrap();
 
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/favicon.ico");
-    let image = image::open(path).unwrap();
+    let icon_bytes = include_bytes!("../assets/favicon.ico");
+    let image = image::load_from_memory(icon_bytes).unwrap();
     let (width, height) = image.dimensions();
     let rgba = image.to_rgba8().into_raw();
     let color_icon = Icon::from_rgba(rgba, width, height).unwrap();
