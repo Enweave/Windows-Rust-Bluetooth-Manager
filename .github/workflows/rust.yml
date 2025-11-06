@@ -20,9 +20,11 @@ jobs:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
 
-    - name: Install powershell-toml module
+    - name: Install PSToml module
       shell: pwsh
-      run: Install-Module -Name powershell-toml -Force -Scope CurrentUser
+      run: |
+        Install-PSResource -Name PSToml -Scope CurrentUser
+        Install-Module -Name PSToml -Scope CurrentUser
 
     - name: Get package name and version
       id: package_info
