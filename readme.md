@@ -1,3 +1,5 @@
+*Just started using rust, i've no idea what i'm doing*
+
 # Windows Rust Bluetooth Manager
 
 Aims to recreate macos menu bar bluetooth manager.
