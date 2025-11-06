@@ -12,12 +12,15 @@ use tokio::runtime::Builder;
 fn main() {
     let rt = Builder::new_current_thread().enable_all().build().unwrap();
 
+    let initial_state = rt.block_on(async { get_bluetooth_state().await.ok().flatten() });
+    let toggle_text = get_toggle_text(initial_state);
+
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/favicon.ico");
     let icon = Icon::from_path(path, Some((32, 32))).unwrap();
     let event_loop = EventLoopBuilder::new().build();
 
     let tray_menu = Menu::new();
-    let toggle_item = MenuItem::new("Toggle Bluetooth", true, None);
+    let toggle_item = MenuItem::new(toggle_text, true, None);
     let quit_item = MenuItem::new("Quit", true, None);
     tray_menu.append_items(&[&toggle_item, &quit_item]).unwrap();
 
@@ -42,6 +45,8 @@ fn main() {
                     if let Err(e) = toggle_bluetooth().await {
                         eprintln!("Error toggling Bluetooth: {:?}", e);
                     }
+                    let new_state = get_bluetooth_state().await.ok().flatten();
+                    toggle_item.set_text(get_toggle_text(new_state));
                 });
             }
             println!("{event:?}");
@@ -66,4 +71,22 @@ async fn toggle_bluetooth() -> Result<()> {
         }
     }
     Ok(())
+}
+
+async fn get_bluetooth_state() -> Result<Option<RadioState>> {
+    let radios = Radio::GetRadiosAsync()?.await?;
+    for radio in radios {
+        if radio.Kind()? == windows::Devices::Radios::RadioKind::Bluetooth {
+            return Ok(Some(radio.State()?));
+        }
+    }
+    Ok(None)
+}
+
+fn get_toggle_text(state: Option<RadioState>) -> &'static str {
+    if let Some(RadioState::On) = state {
+        "Toggle Bluetooth Off"
+    } else {
+        "Toggle Bluetooth On"
+    }
 }
