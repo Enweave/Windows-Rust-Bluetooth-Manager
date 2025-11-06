@@ -1,0 +1,43 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Parse Cargo.toml
+        id: cargo
+        uses: jborean93/PSTomlAction@v1
+        with:
+          path: Cargo.toml
+
+      - name: Build release
+        run: cargo build --release --verbose
+
+      - name: Rename executable
+        id: rename
+        shell: pwsh
+        run: |
+          $exe_name = "${{ steps.cargo.outputs.package_name }}_${{ steps.cargo.outputs.package_version }}.exe"
+          $source_path = "target/release/${{ steps.cargo.outputs.package_name }}.exe"
+          $destination_path = "target/release/$exe_name"
+          Move-Item -Path $source_path -Destination $destination_path
+          echo "EXE_NAME=$exe_name" >> $env:GITHUB_OUTPUT
+
+      - name: Create GitHub Release and upload exe
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          files: target/release/${{ steps.rename.outputs.EXE_NAME }}
