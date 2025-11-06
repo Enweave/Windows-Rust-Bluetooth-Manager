@@ -22,7 +22,7 @@ jobs:
 
     - name: Install PSToml module
       shell: pwsh
-      run: Install-Module -Name PSToml -Scope CurrentUser
+      run: Install-Module -Name PSToml -Scope AllUsers -Force
 
     - name: Get package name and version
       id: package_info
