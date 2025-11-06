@@ -1,5 +1,6 @@
 #![windows_subsystem = "windows"]
 
+use image::GenericImageView;
 use tray_icon::menu::{Menu, MenuEvent, MenuItem};
 use tray_icon::{Icon, TrayIconBuilder, TrayIconEvent};
 use winit::event_loop::{ControlFlow, EventLoopBuilder};
@@ -12,11 +13,23 @@ use tokio::runtime::Builder;
 fn main() {
     let rt = Builder::new_current_thread().enable_all().build().unwrap();
 
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/favicon.ico");
+    let image = image::open(path).unwrap();
+    let (width, height) = image.dimensions();
+    let rgba = image.to_rgba8().into_raw();
+    let color_icon = Icon::from_rgba(rgba, width, height).unwrap();
+
+    let grayscale_rgba = image.grayscale().to_rgba8().into_raw();
+    let gray_icon = Icon::from_rgba(grayscale_rgba, width, height).unwrap();
+
     let initial_state = rt.block_on(async { get_bluetooth_state().await.ok().flatten() });
     let toggle_text = get_toggle_text(initial_state);
+    let initial_icon = if initial_state == Some(RadioState::On) {
+        color_icon.clone()
+    } else {
+        gray_icon.clone()
+    };
 
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/favicon.ico");
-    let icon = Icon::from_path(path, Some((32, 32))).unwrap();
     let event_loop = EventLoopBuilder::new().build();
 
     let tray_menu = Menu::new();
@@ -24,10 +37,10 @@ fn main() {
     let quit_item = MenuItem::new("Quit", true, None);
     tray_menu.append_items(&[&toggle_item, &quit_item]).unwrap();
 
-    let _tray_icon = TrayIconBuilder::new()
+    let tray_icon = TrayIconBuilder::new()
         .with_menu(Box::new(tray_menu))
         .with_tooltip("Bluetooth Manager")
-        .with_icon(icon)
+        .with_icon(initial_icon)
         .build()
         .unwrap();
 
@@ -47,6 +60,11 @@ fn main() {
                     }
                     let new_state = get_bluetooth_state().await.ok().flatten();
                     toggle_item.set_text(get_toggle_text(new_state));
+                    if new_state == Some(RadioState::On) {
+                        tray_icon.set_icon(Some(color_icon.clone())).unwrap();
+                    } else {
+                        tray_icon.set_icon(Some(gray_icon.clone())).unwrap();
+                    }
                 });
             }
             println!("{event:?}");
