@@ -13,3 +13,6 @@ Aims to recreate macos menu bar bluetooth manager.
 - [ ] forget devices
 - [ ] temporary disconnect
 - [ ] optional autolaunch on startup
+
+## Why?
+I always found it weird that one cannot simply pin a Bluetooth Icon in windows` tray — once you switch bt off - it's gone.
