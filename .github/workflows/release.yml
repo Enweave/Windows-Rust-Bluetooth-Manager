@@ -16,11 +16,19 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Parse Cargo.toml
-        id: cargo
-        uses: jborean93/PSTomlAction@v1
-        with:
-          path: Cargo.toml
+      - name: Install PSToml module
+        shell: pwsh
+        run: Install-Module -Name PSToml -Scope AllUsers -Force
+
+      - name: Get package name and version
+        id: package_info
+        shell: pwsh
+        run: |
+          $cargo_toml = Get-Content -Path "Cargo.toml" -Raw | ConvertFrom-Toml
+          $package_name = $cargo_toml.package.name
+          $package_version = $cargo_toml.package.version
+          echo "PACKAGE_NAME=$package_name" >> $env:GITHUB_OUTPUT
+          echo "PACKAGE_VERSION=$package_version" >> $env:GITHUB_OUTPUT
 
       - name: Build release
         run: cargo build --release --verbose
