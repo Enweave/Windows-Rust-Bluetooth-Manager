@@ -9,13 +9,11 @@ use windows::{
     Devices::Radios::{Radio, RadioState},
 };
 use tokio::runtime::Builder;
-use toml::Value;
+
+mod version_info;
 
 fn main() {
-    let cargo_toml_str = include_str!("../Cargo.toml");
-    let cargo_toml: Value = toml::from_str(cargo_toml_str).unwrap();
-    let version: String = cargo_toml["package"]["version"].as_str().unwrap().to_owned();
-    let repository: String = cargo_toml["package"]["repository"].as_str().unwrap().to_owned();
+    let version_info = version_info::create_version_item();
 
     let rt = Builder::new_current_thread().enable_all().build().unwrap();
 
@@ -40,9 +38,10 @@ fn main() {
 
     let tray_menu = Menu::new();
     let toggle_item = MenuItem::new(toggle_text, true, None);
-    let version_item = MenuItem::new(format!("Version {}", version), true, None);
     let quit_item = MenuItem::new("Quit", true, None);
-    tray_menu.append_items(&[&toggle_item, &version_item, &quit_item]).unwrap();
+    tray_menu
+        .append_items(&[&toggle_item, &version_info.item, &quit_item])
+        .unwrap();
 
     let tray_icon = TrayIconBuilder::new()
         .with_menu(Box::new(tray_menu))
@@ -73,8 +72,8 @@ fn main() {
                         tray_icon.set_icon(Some(gray_icon.clone())).unwrap();
                     }
                 });
-            } else if event.id == version_item.id() {
-                webbrowser::open(&repository).unwrap();
+            } else if event.id == version_info.item.id() {
+                webbrowser::open(&version_info.repository).unwrap();
             }
             println!("{event:?}");
         }
