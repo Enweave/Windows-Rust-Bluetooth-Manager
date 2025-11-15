@@ -1,6 +1,6 @@
 [package]
 name = "windows_rust_bluetooth_manager"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 repository = "https://github.com/Enweave/Windows-Rust-Bluetooth-Manager"
 

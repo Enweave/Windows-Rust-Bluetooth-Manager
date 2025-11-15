@@ -53,4 +53,4 @@ jobs:
           tag: v${{ steps.package_info.outputs.PACKAGE_VERSION }}
           name: Release v${{ steps.package_info.outputs.PACKAGE_VERSION }}
           body: ${{ github.event.pull_request.body }}
-          files: target/release/${{ steps.rename.outputs.EXE_NAME }}
+          artifacts: target/release/${{ steps.rename.outputs.EXE_NAME }}
