@@ -1,12 +1,14 @@
 name: Create Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  pull_request:
+    types: [closed]
+    branches:
+      - main
 
 jobs:
   release:
+    if: github.event.pull_request.merged == true
     runs-on: windows-latest
     permissions:
       contents: write
@@ -48,6 +50,7 @@ jobs:
       - name: Create GitHub Release and upload exe
         uses: ncipollo/release-action@v1
         with:
-          tag: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          tag: v${{ steps.package_info.outputs.PACKAGE_VERSION }}
+          name: Release v${{ steps.package_info.outputs.PACKAGE_VERSION }}
+          body: ${{ github.event.pull_request.body }}
           files: target/release/${{ steps.rename.outputs.EXE_NAME }}

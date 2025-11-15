@@ -1,21 +1,22 @@
+// src/main.rs
 #![windows_subsystem = "windows"]
 
 use image::GenericImageView;
+use std::time::{Duration, Instant};
+use tokio::runtime::Builder;
 use tray_icon::menu::{Menu, MenuEvent, MenuItem};
 use tray_icon::{Icon, TrayIconBuilder, TrayIconEvent};
+use windows::Devices::Radios::RadioState;
 use winit::event_loop::{ControlFlow, EventLoopBuilder};
-use windows::{
-    core::Result,
-    Devices::Radios::{Radio, RadioState},
-};
-use tokio::runtime::Builder;
-use toml::Value;
+
+mod toggle_button;
+mod version_info;
+
+
+const CHECK_INTERVAL: Duration = Duration::from_secs(1);
 
 fn main() {
-    let cargo_toml_str = include_str!("../Cargo.toml");
-    let cargo_toml: Value = toml::from_str(cargo_toml_str).unwrap();
-    let version: String = cargo_toml["package"]["version"].as_str().unwrap().to_owned();
-    let repository: String = cargo_toml["package"]["repository"].as_str().unwrap().to_owned();
+    let version_info = version_info::create_version_item();
 
     let rt = Builder::new_current_thread().enable_all().build().unwrap();
 
@@ -28,8 +29,9 @@ fn main() {
     let grayscale_rgba = image.grayscale().to_rgba8().into_raw();
     let gray_icon = Icon::from_rgba(grayscale_rgba, width, height).unwrap();
 
-    let initial_state = rt.block_on(async { get_bluetooth_state().await.ok().flatten() });
-    let toggle_text = get_toggle_text(initial_state);
+    let initial_state = rt.block_on(async { toggle_button::get_bluetooth_state().await.ok().flatten() });
+    let mut toggle_button = toggle_button::ToggleButton::new(initial_state);
+
     let initial_icon = if initial_state == Some(RadioState::On) {
         color_icon.clone()
     } else {
@@ -39,10 +41,10 @@ fn main() {
     let event_loop = EventLoopBuilder::new().build();
 
     let tray_menu = Menu::new();
-    let toggle_item = MenuItem::new(toggle_text, true, None);
-    let version_item = MenuItem::new(format!("Version {}", version), true, None);
     let quit_item = MenuItem::new("Quit", true, None);
-    tray_menu.append_items(&[&toggle_item, &version_item, &quit_item]).unwrap();
+    tray_menu
+        .append_items(&[&toggle_button.item, &version_info.item, &quit_item])
+        .unwrap();
 
     let tray_icon = TrayIconBuilder::new()
         .with_menu(Box::new(tray_menu))
@@ -52,68 +54,32 @@ fn main() {
         .unwrap();
 
     let menu_channel = MenuEvent::receiver();
-    let tray_channel = TrayIconEvent::receiver();
+    let _tray_channel = TrayIconEvent::receiver();
+
 
     event_loop.run(move |_event, _, control_flow| {
-        *control_flow = ControlFlow::Wait;
+        *control_flow = ControlFlow::WaitUntil(Instant::now() + CHECK_INTERVAL);
 
         if let Ok(event) = menu_channel.try_recv() {
             if event.id == quit_item.id() {
                 *control_flow = ControlFlow::Exit;
-            } else if event.id == toggle_item.id() {
+            } else if event.id == toggle_button.item.id() {
                 rt.block_on(async {
-                    if let Err(e) = toggle_bluetooth().await {
-                        eprintln!("Error toggling Bluetooth: {:?}", e);
-                    }
-                    let new_state = get_bluetooth_state().await.ok().flatten();
-                    toggle_item.set_text(get_toggle_text(new_state));
-                    if new_state == Some(RadioState::On) {
-                        tray_icon.set_icon(Some(color_icon.clone())).unwrap();
-                    } else {
-                        tray_icon.set_icon(Some(gray_icon.clone())).unwrap();
-                    }
+                    toggle_button
+                        .handle_click(&tray_icon, &color_icon, &gray_icon)
+                        .await;
                 });
-            } else if event.id == version_item.id() {
-                webbrowser::open(&repository).unwrap();
+            } else if event.id == version_info.item.id() {
+                webbrowser::open(&version_info.repository).unwrap();
             }
-            println!("{event:?}");
         }
 
-        if let Ok(event) = tray_channel.try_recv() {
-            println!("{event:?}");
-        }
+        // Periodically check for external state changes
+        rt.block_on(async {
+            let new_state = toggle_button::get_bluetooth_state().await.ok().flatten();
+            if new_state != toggle_button.state {
+                toggle_button.update_state(new_state, &tray_icon, &color_icon, &gray_icon);
+            }
+        });
     });
-}
-
-async fn toggle_bluetooth() -> Result<()> {
-    let radios = Radio::GetRadiosAsync()?.await?;
-    for radio in radios {
-        if radio.Kind()? == windows::Devices::Radios::RadioKind::Bluetooth {
-            let state = radio.State()?;
-            if state == RadioState::On {
-                radio.SetStateAsync(RadioState::Off)?.await?;
-            } else {
-                radio.SetStateAsync(RadioState::On)?.await?;
-            }
-        }
-    }
-    Ok(())
-}
-
-async fn get_bluetooth_state() -> Result<Option<RadioState>> {
-    let radios = Radio::GetRadiosAsync()?.await?;
-    for radio in radios {
-        if radio.Kind()? == windows::Devices::Radios::RadioKind::Bluetooth {
-            return Ok(Some(radio.State()?));
-        }
-    }
-    Ok(None)
-}
-
-fn get_toggle_text(state: Option<RadioState>) -> &'static str {
-    if let Some(RadioState::On) = state {
-        "Toggle Bluetooth Off"
-    } else {
-        "Toggle Bluetooth On"
-    }
 }
