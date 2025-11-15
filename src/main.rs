@@ -2,6 +2,7 @@
 #![windows_subsystem = "windows"]
 
 use image::GenericImageView;
+use std::time::{Duration, Instant};
 use tokio::runtime::Builder;
 use tray_icon::menu::{Menu, MenuEvent, MenuItem};
 use tray_icon::{Icon, TrayIconBuilder, TrayIconEvent};
@@ -10,6 +11,9 @@ use winit::event_loop::{ControlFlow, EventLoopBuilder};
 
 mod toggle_button;
 mod version_info;
+
+
+const CHECK_INTERVAL: Duration = Duration::from_secs(1);
 
 fn main() {
     let version_info = version_info::create_version_item();
@@ -26,7 +30,7 @@ fn main() {
     let gray_icon = Icon::from_rgba(grayscale_rgba, width, height).unwrap();
 
     let initial_state = rt.block_on(async { toggle_button::get_bluetooth_state().await.ok().flatten() });
-    let toggle_button = toggle_button::ToggleButton::new(initial_state);
+    let mut toggle_button = toggle_button::ToggleButton::new(initial_state);
 
     let initial_icon = if initial_state == Some(RadioState::On) {
         color_icon.clone()
@@ -52,8 +56,9 @@ fn main() {
     let menu_channel = MenuEvent::receiver();
     let _tray_channel = TrayIconEvent::receiver();
 
+
     event_loop.run(move |_event, _, control_flow| {
-        *control_flow = ControlFlow::Wait;
+        *control_flow = ControlFlow::WaitUntil(Instant::now() + CHECK_INTERVAL);
 
         if let Ok(event) = menu_channel.try_recv() {
             if event.id == quit_item.id() {
@@ -68,5 +73,13 @@ fn main() {
                 webbrowser::open(&version_info.repository).unwrap();
             }
         }
+
+        // Periodically check for external state changes
+        rt.block_on(async {
+            let new_state = toggle_button::get_bluetooth_state().await.ok().flatten();
+            if new_state != toggle_button.state {
+                toggle_button.update_state(new_state, &tray_icon, &color_icon, &gray_icon);
+            }
+        });
     });
 }

@@ -10,17 +10,37 @@ use windows::{
 
 pub struct ToggleButton {
     pub item: MenuItem,
+    pub state: Option<RadioState>,
 }
 
 impl ToggleButton {
     pub fn new(initial_state: Option<RadioState>) -> Self {
         let toggle_text = get_toggle_text(initial_state);
         let item = MenuItem::new(toggle_text, true, None);
-        Self { item }
+        Self {
+            item,
+            state: initial_state,
+        }
+    }
+
+    pub fn update_state(
+        &mut self,
+        new_state: Option<RadioState>,
+        tray_icon: &TrayIcon,
+        color_icon: &Icon,
+        gray_icon: &Icon,
+    ) {
+        self.state = new_state;
+        self.item.set_text(get_toggle_text(new_state));
+        if new_state == Some(RadioState::On) {
+            tray_icon.set_icon(Some(color_icon.clone())).unwrap();
+        } else {
+            tray_icon.set_icon(Some(gray_icon.clone())).unwrap();
+        }
     }
 
     pub async fn handle_click(
-        &self,
+        &mut self,
         tray_icon: &TrayIcon,
         color_icon: &Icon,
         gray_icon: &Icon,
@@ -29,12 +49,7 @@ impl ToggleButton {
             eprintln!("Error toggling Bluetooth: {:?}", e);
         }
         let new_state = get_bluetooth_state().await.ok().flatten();
-        self.item.set_text(get_toggle_text(new_state));
-        if new_state == Some(RadioState::On) {
-            tray_icon.set_icon(Some(color_icon.clone())).unwrap();
-        } else {
-            tray_icon.set_icon(Some(gray_icon.clone())).unwrap();
-        }
+        self.update_state(new_state, tray_icon, color_icon, gray_icon);
     }
 }
 
